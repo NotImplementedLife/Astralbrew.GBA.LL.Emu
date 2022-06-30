@@ -64,6 +64,17 @@ public:
 	virtual std::string to_string(const InstructionFormat& format = DefaultInstructionFormat) const override;
 
 private:
+	/// <summary>
+	/// Validates Arithmetic & Logic instructions
+	/// </summary>	
 	bool valid_alu() const;
+	/// <summary>
+	/// Validates Multiply instructions (MUL, MLA)
+	/// </summary>	
+	bool valid_mul() const;
+	/// <summary>
+	/// Validates Long Multiply instructions
+	/// </summary>	
+	bool valid_mull() const;
 };
 

@@ -456,21 +456,59 @@ std::string ARMInstruction::to_string(const InstructionFormat& format) const
 		break;
 	case ARMInstruction::Type::DataProc_Reg_ShImm:
 	{
-		instr_name = alu_name(data.at("Op"));
+		u8 opc = data.at("Op");
+		instr_name = alu_name(opc);
+		if (data.at("S") == 1 && (opc < 0x8 || opc>0xB)) instr_name += "S";
 		break;
 	}
 	case ARMInstruction::Type::DataProc_Reg_ShReg:
-		instr_name = alu_name(data.at("Op"));
+	{
+		u8 opc = data.at("Op");
+		instr_name = alu_name(opc);
+		if (data.at("S") == 1 && (opc < 0x8 || opc>0xB)) instr_name += "S";
 		break;
+	}
 	case ARMInstruction::Type::DataProc_Imm:
-		instr_name = alu_name(data.at("Op"));
+	{
+		u8 opc = data.at("Op");
+		instr_name = alu_name(opc);
+		if (data.at("S") == 1 && (opc < 0x8 || opc>0xB)) instr_name += "S";
 		break;
+	}
 	case ARMInstruction::Type::PSR_Imm:
 		instr_name = "[PSR_Imm]";
 		break;
 	case ARMInstruction::Type::PSR_Reg:
-		instr_name = "[PSR_Reg]";
+	{
+		// 0: MRS{ cond } Rd,Psr          ;Rd = Psr
+		// 1: MSR{ cond } Psr{ _field }, Op; Psr[field] = Op
+		u8 opcode = data.at("L");
+
+		//(0=CPSR, 1=SPSR_<current mode>)
+		u8 psr = data.at("P");
+
+		if (opcode == 0) // MRS
+		{
+			instr_name = "MRS";
+			op_1 = string_format("R%i", data.at("Rd"));
+			op_2 = psr == 0 ? "CPSR" : "SPSR";
+		}
+		else // MSR
+		{
+			instr_name = "MSR";
+			op_1 = psr == 0 ? "CPSR" : "SPSR";			
+			u8 field = data.at("Field");
+			if (field != 0) op_1 += "_";
+			if (field & 0b1000) op_1 += "f";
+			if (field & 0b0100) op_1 += "s";
+			if (field & 0b0010) op_1 += "x";
+			if (field & 0b0001) op_1 += "c";
+
+			op_2 = string_format("R%i", data.at("Rm"));
+		}
+
 		break;
+	}
 	case ARMInstruction::Type::BX_BLX:
 	{		
 		instr_name = data.at("L") == 0 ? "BX" : "BLX";						
@@ -509,7 +547,7 @@ std::string ARMInstruction::to_string(const InstructionFormat& format) const
 		instr_name = "[Undefined]";
 		break;
 	case ARMInstruction::Type::BlockTrans:
-		instr_name = "BlockTrans";
+		instr_name = "[BlockTrans]";
 		break;
 
 	case ARMInstruction::Type::B_BL_BLX_Offset:
@@ -517,8 +555,7 @@ std::string ARMInstruction::to_string(const InstructionFormat& format) const
 		if (data.at("L") == 1)
 			instr_name = "BL";
 		else
-			instr_name = "B";
-		instr_name += condition_suffix(data.at("Cond"));
+			instr_name = "B";		
 
 		s32 n24 = data.at("Offset") & 0x000F0000 ? (0xFFF00000 | data.at("Offset")) : data.at("Offset");
 		u32 offset = address + 8 + 4 * n24;
@@ -543,8 +580,11 @@ std::string ARMInstruction::to_string(const InstructionFormat& format) const
 		break;
 	}
 
+	instr_name += condition_suffix(data.at("Cond"));
+
 	result += instr_name;
 	if (op_1 != "") result += " " + op_1;
+	if (op_2 != "") result += ", " + op_2;
 	
 	return result;
 }
@@ -610,8 +650,28 @@ bool ARMInstruction::valid_alu() const
 			return false;
 		}
 	}	
+	return true;
+}
+
+bool ARMInstruction::valid_mul() const
+{	
+	u8 Rm = data.at("Rm");
+	u8 Rd = data.at("Rd");
+	u8 Rn = data.at("Rn");
+	u8 Rs = data.at("Rs");
+
+	// Rd may not be same as Rm.
+	if (Rd == Rm) return false;
+
+	//Rd, Rn, Rs, Rm may not be R15.
+	if (Rd == 0xF || Rn == 0xF || Rs == 0xF || Rm == 0xF)
+		return false;
+
 	
+	return true;
+}
 
-
+bool ARMInstruction::valid_mull() const
+{
 	return true;
 }
