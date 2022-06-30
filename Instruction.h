@@ -16,7 +16,7 @@ protected:
 public:
 	virtual void decode() = 0;
 	virtual void execute(Cpu* cpu) = 0;
-	virtual std::string to_string(const InstructionFormat& format = DefaultInstructionFormat);
+	virtual std::string to_string(const InstructionFormat& format = DefaultInstructionFormat) const;
 
 	static std::string condition_suffix(u8 cond);
 };

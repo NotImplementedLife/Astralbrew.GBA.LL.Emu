@@ -22,6 +22,17 @@ static const int OPCODE_MOV = 0xD;
 static const int OPCODE_BIC = 0xE;
 static const int OPCODE_MVN = 0xF;
 
+// MUL Opcodes
+
+static const int OPCODE_MUL   = 0x0;
+static const int OPCODE_MLA   = 0x1;
+static const int OPCODE_UMAAL = 0x2;
+static const int OPCODE_UMULL = 0x4;
+static const int OPCODE_UMLAL = 0x5;
+static const int OPCODE_SMULL = 0x6;
+static const int OPCODE_SMLAL = 0x7;
+
+
 struct ARMControlBits
 {
 	u8 h, l;
@@ -420,7 +431,7 @@ void ARMInstruction::execute(Cpu* cpu)
 
 #include <sstream>
 
-std::string ARMInstruction::to_string(const InstructionFormat& format)
+std::string ARMInstruction::to_string(const InstructionFormat& format) const
 {
 	string result = "";
 
@@ -445,47 +456,57 @@ std::string ARMInstruction::to_string(const InstructionFormat& format)
 		break;
 	case ARMInstruction::Type::DataProc_Reg_ShImm:
 	{
-		instr_name = alu_name(data["Op"]);
+		instr_name = alu_name(data.at("Op"));
 		break;
 	}
 	case ARMInstruction::Type::DataProc_Reg_ShReg:
-		instr_name = alu_name(data["Op"]);
+		instr_name = alu_name(data.at("Op"));
 		break;
 	case ARMInstruction::Type::DataProc_Imm:
-		instr_name = alu_name(data["Op"]);
+		instr_name = alu_name(data.at("Op"));
 		break;
 	case ARMInstruction::Type::PSR_Imm:
-		instr_name = "PSR_Imm";
+		instr_name = "[PSR_Imm]";
 		break;
 	case ARMInstruction::Type::PSR_Reg:
-		instr_name = "PSR_Reg";
+		instr_name = "[PSR_Reg]";
 		break;
 	case ARMInstruction::Type::BX_BLX:
-		instr_name = "BX_BLX";
+	{		
+		instr_name = data.at("L") == 0 ? "BX" : "BLX";						
+		op_1 = string_format("R%i",data.at("Rn"));
+
 		break;
-	case ARMInstruction::Type::Multiply:
-		instr_name = "Multiply";
+	}
+	case ARMInstruction::Type::Multiply:		
+	{
+		instr_name = mul_name(data.at("Op"));
+
 		break;
+	}
 	case ARMInstruction::Type::MulLong:
-		instr_name = "MulLong";
+	{
+		instr_name = mul_name(data.at("Op"));
+
 		break;
+	}
 	case ARMInstruction::Type::TransSwp12:
-		instr_name = "TransSwp12";
+		instr_name = "[TransSwp12]";
 		break;
 	case ARMInstruction::Type::TransReg10:
-		instr_name = "TransReg10";
+		instr_name = "[TransReg10]";
 		break;
 	case ARMInstruction::Type::TransImm10:
-		instr_name = "TransImm10";
+		instr_name = "[TransImm10]";
 		break;
 	case ARMInstruction::Type::TransImm9:
-		instr_name = "TransImm9";
+		instr_name = "[TransImm9]";
 		break;
 	case ARMInstruction::Type::TransReg9:
-		instr_name = "TransReg9";
+		instr_name = "[TransReg9]";
 		break;
 	case ARMInstruction::Type::Undefined:
-		instr_name = "Undefined";
+		instr_name = "[Undefined]";
 		break;
 	case ARMInstruction::Type::BlockTrans:
 		instr_name = "BlockTrans";
@@ -493,13 +514,13 @@ std::string ARMInstruction::to_string(const InstructionFormat& format)
 
 	case ARMInstruction::Type::B_BL_BLX_Offset:
 	{
-		if (data["L"] == 1)
+		if (data.at("L") == 1)
 			instr_name = "BL";
 		else
 			instr_name = "B";
-		instr_name += condition_suffix(data["Cond"]);
+		instr_name += condition_suffix(data.at("Cond"));
 
-		s32 n24 = data["Offset"] & 0x000F0000 ? (0xFFF00000 | data["Offset"]) : data["Offset"];
+		s32 n24 = data.at("Offset") & 0x000F0000 ? (0xFFF00000 | data.at("Offset")) : data.at("Offset");
 		u32 offset = address + 8 + 4 * n24;
 
 		op_1 = "Lxx_0x" + string_format("%X",offset);
@@ -549,6 +570,22 @@ std::string ARMInstruction::alu_name(u8 opcode)
 	case OPCODE_BIC: return "BIC"; // Rd, Rn, Op2; bit clear         // Rd = Rn AND NOT Op2
 	case OPCODE_MVN: return "MVN"; // Rd, Op2; not // Rd = NOT Op2
 	}
+	throw std::exception(string_format("Unknown ALU opcode : %u", opcode).c_str());
+}
+
+std::string ARMInstruction::mul_name(u8 opcode)
+{
+	switch (opcode)
+	{
+	case OPCODE_MUL: return "MUL";
+	case OPCODE_MLA: return "MLA"; 
+	case OPCODE_UMAAL: return "UMAAL";
+	case OPCODE_UMULL: return "UMULL"; 
+	case OPCODE_UMLAL: return "UMLAL"; 
+	case OPCODE_SMULL: return "SMULL"; 
+	case OPCODE_SMLAL: return "SMLAL"; 
+	}
+	throw std::exception(string_format("Unknown MUL opcode : %u",opcode).c_str());
 }
 
 

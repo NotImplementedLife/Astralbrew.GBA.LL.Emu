@@ -1,7 +1,7 @@
 #include "Instruction.h"
 
 
-std::string Instruction::to_string(const InstructionFormat&)
+std::string Instruction::to_string(const InstructionFormat&) const
 {
 	return "???";
 }

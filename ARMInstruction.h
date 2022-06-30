@@ -54,13 +54,14 @@ private:
 	std::map<std::string, u32> data;
 
 	static std::string alu_name(u8 opcode);
+	static std::string mul_name(u8 opcode);
 
 	bool is_valid() const;
 public:
 	ARMInstruction(u32 address, u32 opcode);
 	virtual void decode() override;
 	virtual void execute(Cpu* cpu) override;
-	virtual std::string to_string(const InstructionFormat& format = DefaultInstructionFormat) override;
+	virtual std::string to_string(const InstructionFormat& format = DefaultInstructionFormat) const override;
 
 private:
 	bool valid_alu() const;
