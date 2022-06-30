@@ -4,6 +4,24 @@
 #include <cassert>
 using namespace std;
 
+// ALU Opcodes
+static const int OPCODE_AND = 0x0;
+static const int OPCODE_EOR = 0x1;
+static const int OPCODE_SUB = 0x2;
+static const int OPCODE_RSB = 0x3;
+static const int OPCODE_ADD = 0x4;
+static const int OPCODE_ADC = 0x5;
+static const int OPCODE_SBC = 0x6;
+static const int OPCODE_RSC = 0x7;
+static const int OPCODE_TST = 0x8;
+static const int OPCODE_TEQ = 0x9;
+static const int OPCODE_CMP = 0xA;
+static const int OPCODE_CMN = 0xB;
+static const int OPCODE_ORR = 0xC;
+static const int OPCODE_MOV = 0xD;
+static const int OPCODE_BIC = 0xE;
+static const int OPCODE_MVN = 0xF;
+
 struct ARMControlBits
 {
 	u8 h, l;
@@ -23,12 +41,11 @@ struct ARMFilterData
 	vector<ARMField> fields;		
 
 	inline bool test_control_bits(u32 opcode, map<string, u32>& data, ARMInstruction::Type& type) const
-	{
+	{		
 		for (const auto& cb : control_bits)
 		{
 			if (!__has_bits__(opcode, cb.h, cb.l, cb.val))
-			{				
-				type = ARMInstruction::Type::Unknown;
+			{								
 				return false;
 			}
 		}		
@@ -48,7 +65,7 @@ struct ARMFilterData
 static const ARMFilterData ARM_INSTR_TYPES[] =
 {
 	{
-		ARMInstruction::Type::DataProc_Reg,
+		ARMInstruction::Type::DataProc_Reg_ShImm, 
 		{ {27,25,0b000}, {4,4,0b0} },
 		{ 
 			{31,28,"Cond"}, 
@@ -306,6 +323,7 @@ static const ARMFilterData ARM_INSTR_TYPES[] =
 		}
 	},
 };
+
 static const int ARM_INSTR_TYPES_SIZE = sizeof(ARM_INSTR_TYPES) / sizeof(ARMFilterData);
 
 ARMInstruction::ARMInstruction(u32 address, u32 opcode) : opcode(opcode) 
@@ -315,13 +333,84 @@ ARMInstruction::ARMInstruction(u32 address, u32 opcode) : opcode(opcode)
 
 void ARMInstruction::decode()
 {
+	type = ARMInstruction::Type::Unknown;
+	int interpretation_cnt = 0;	
 	for (const auto& filter : ARM_INSTR_TYPES)
 	{
 		if (filter.test_control_bits(opcode, data, type))
-		{
-			break;
+		{						
+			interpretation_cnt += is_valid();
 		}
 	}		
+	if (interpretation_cnt > 1)
+	{
+		throw std::exception("Same opcode decodes to multiple valid instructions.");
+	}
+}
+
+
+bool ARMInstruction::is_valid() const
+{
+	switch (type)
+	{
+	case ARMInstruction::Type::Unknown:
+		break;
+	case ARMInstruction::Type::DataProc_Reg_ShImm: // Bit 25 = 0, Bit 4 = 0
+	{
+		if (!valid_alu()) return false;		
+
+		break;
+	}
+	case ARMInstruction::Type::DataProc_Reg_ShReg: // Bit 25 = 0, Bit 4 = 1
+	{
+		if (!valid_alu()) return false;
+
+		break;
+	}
+	case ARMInstruction::Type::DataProc_Imm: // Bit25 = 1
+	{
+		if (!valid_alu()) return false;
+
+		break;
+	}
+	case ARMInstruction::Type::PSR_Imm:
+		break;
+	case ARMInstruction::Type::PSR_Reg:
+		break;
+	case ARMInstruction::Type::BX_BLX:
+		break;
+	case ARMInstruction::Type::Multiply:
+		break;
+	case ARMInstruction::Type::MulLong:
+		break;
+	case ARMInstruction::Type::TransSwp12:
+		break;
+	case ARMInstruction::Type::TransReg10:
+		break;
+	case ARMInstruction::Type::TransImm10:
+		break;
+	case ARMInstruction::Type::TransImm9:
+		break;
+	case ARMInstruction::Type::TransReg9:
+		break;
+	case ARMInstruction::Type::Undefined:
+		break;
+	case ARMInstruction::Type::BlockTrans:
+		break;
+	case ARMInstruction::Type::B_BL_BLX_Offset:
+		break;
+	case ARMInstruction::Type::CoDataTrans:
+		break;
+	case ARMInstruction::Type::CoDataOp:
+		break;
+	case ARMInstruction::Type::CoRegTrans:
+		break;
+	case ARMInstruction::Type::SWI:
+		break;
+	default:
+		break;
+	}
+	return true;
 }
 
 void ARMInstruction::execute(Cpu* cpu)
@@ -354,14 +443,16 @@ std::string ARMInstruction::to_string(const InstructionFormat& format)
 	case ARMInstruction::Type::Unknown:
 		instr_name = "???";
 		break;
-	case ARMInstruction::Type::DataProc_Reg:
-		instr_name = "DataProd_Reg";
+	case ARMInstruction::Type::DataProc_Reg_ShImm:
+	{
+		instr_name = alu_name(data["Op"]);
 		break;
+	}
 	case ARMInstruction::Type::DataProc_Reg_ShReg:
-		instr_name = "DataProd_ShReg";
+		instr_name = alu_name(data["Op"]);
 		break;
 	case ARMInstruction::Type::DataProc_Imm:
-		instr_name = "DataProd_Imm";
+		instr_name = alu_name(data["Op"]);
 		break;
 	case ARMInstruction::Type::PSR_Imm:
 		instr_name = "PSR_Imm";
@@ -435,4 +526,55 @@ std::string ARMInstruction::to_string(const InstructionFormat& format)
 	if (op_1 != "") result += " " + op_1;
 	
 	return result;
+}
+
+std::string ARMInstruction::alu_name(u8 opcode)
+{
+	switch (opcode)
+	{
+	case OPCODE_AND: return "AND";
+	case OPCODE_EOR: return "EOR"; // Rd, Rn, Op2; XOR logical       // Rd = Rn XOR Op2
+	case OPCODE_SUB: return "SUB"; // Rd, Rn, Op2; *; subtract          // Rd = Rn - Op2
+	case OPCODE_RSB: return "RSB"; // Rd, Rn, Op2;*; subtract reversed // Rd = Op2 - Rn
+	case OPCODE_ADD: return "ADD"; // Rd, Rn, Op2; *; add               // Rd = Rn + Op2
+	case OPCODE_ADC: return "ADC"; // Rd, Rn, Op2; *; add with carry    // Rd = Rn + Op2 + Cy
+	case OPCODE_SBC: return "SBC"; // Rd, Rn, Op2; *; sub with carry    // Rd = Rn - Op2 + Cy - 1
+	case OPCODE_RSC: return "RSC"; // Rd, Rn, Op2; *; sub cy.reversed  // Rd = Op2 - Rn + Cy - 1
+	case OPCODE_TST: return "TST"; // Rn, Op2; test            Void = Rn AND Op2
+	case OPCODE_TEQ: return "TEQ"; // Rn, Op2; test exclusive  Void = Rn XOR Op2
+	case OPCODE_CMP: return "CMP"; // Rn, Op2;*; compare         Void = Rn - Op2
+	case OPCODE_CMN: return "CMN"; // Rn, Op2; *; compare neg.Void = Rn + Op2
+	case OPCODE_ORR: return "ORR"; // Rd, Rn, Op2; OR logical        // Rd = Rn OR Op2
+	case OPCODE_MOV: return "MOV"; // Rd, Op2; move              // Rd = Op2
+	case OPCODE_BIC: return "BIC"; // Rd, Rn, Op2; bit clear         // Rd = Rn AND NOT Op2
+	case OPCODE_MVN: return "MVN"; // Rd, Op2; not // Rd = NOT Op2
+	}
+}
+
+
+bool ARMInstruction::valid_alu() const
+{
+	u32 alu_opcode = data.at("Op");	
+
+	if (0x8 <= alu_opcode && alu_opcode <= 0xB)	
+	{
+		// S - Set Condition Codes (0=No, 1=Yes) (Must be 1 for opcode 8-B)
+		u32 S = data.at("S");
+		if (S == 0)
+		{
+			return false;
+		}
+
+		// Rd - Destination Register (R0..R15) (including PC=R15)
+		// Must be 0000b(or 1111b) for CMP / CMN / TST / TEQ{ P }.
+		u32 Rd = data.at("Rd");
+		if (Rd != 0x0 && Rd != 0xF)
+		{
+			return false;
+		}
+	}	
+	
+
+
+	return true;
 }
