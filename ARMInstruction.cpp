@@ -31,8 +31,7 @@ struct ARMFilterData
 				type = ARMInstruction::Type::Unknown;
 				return false;
 			}
-		}
-		std::cout << "HERE\n";
+		}		
 		type = this->type;
 		data.clear();
 		for (const auto& field : fields)
@@ -334,7 +333,11 @@ void ARMInstruction::execute(Cpu* cpu)
 
 std::string ARMInstruction::to_string(const InstructionFormat& format)
 {
-	std::string result = "";
+	string result = "";
+
+	string instr_name = "";
+	string op_1 = "";
+	string op_2 = "";
 
 	if (format.show_address)
 	{		
@@ -349,72 +352,87 @@ std::string ARMInstruction::to_string(const InstructionFormat& format)
 	switch (type)
 	{
 	case ARMInstruction::Type::Unknown:
-		result += "???";
+		instr_name = "???";
 		break;
 	case ARMInstruction::Type::DataProc_Reg:
-		result += "DataProd_Reg";
+		instr_name = "DataProd_Reg";
 		break;
 	case ARMInstruction::Type::DataProc_Reg_ShReg:
-		result += "DataProd_ShReg";
+		instr_name = "DataProd_ShReg";
 		break;
 	case ARMInstruction::Type::DataProc_Imm:
-		result += "DataProd_Imm";
+		instr_name = "DataProd_Imm";
 		break;
 	case ARMInstruction::Type::PSR_Imm:
-		result += "PSR_Imm";
+		instr_name = "PSR_Imm";
 		break;
 	case ARMInstruction::Type::PSR_Reg:
-		result += "PSR_Reg";
+		instr_name = "PSR_Reg";
 		break;
 	case ARMInstruction::Type::BX_BLX:
-		result += "BX_BLX";
+		instr_name = "BX_BLX";
 		break;
 	case ARMInstruction::Type::Multiply:
-		result += "Multiply";
+		instr_name = "Multiply";
 		break;
 	case ARMInstruction::Type::MulLong:
-		result += "MulLong";
+		instr_name = "MulLong";
 		break;
 	case ARMInstruction::Type::TransSwp12:
-		result += "TransSwp12";
+		instr_name = "TransSwp12";
 		break;
 	case ARMInstruction::Type::TransReg10:
-		result += "TransReg10";
+		instr_name = "TransReg10";
 		break;
 	case ARMInstruction::Type::TransImm10:
-		result += "TransImm10";
+		instr_name = "TransImm10";
 		break;
 	case ARMInstruction::Type::TransImm9:
-		result += "TransImm9";
+		instr_name = "TransImm9";
 		break;
 	case ARMInstruction::Type::TransReg9:
-		result += "TransReg9";
+		instr_name = "TransReg9";
 		break;
 	case ARMInstruction::Type::Undefined:
-		result += "Undefined";
+		instr_name = "Undefined";
 		break;
 	case ARMInstruction::Type::BlockTrans:
-		result += "BlockTrans";
+		instr_name = "BlockTrans";
 		break;
+
 	case ARMInstruction::Type::B_BL_BLX_Offset:
-		result += "B_BL_BLX_Offset";
+	{
+		if (data["L"] == 1)
+			instr_name = "BL";
+		else
+			instr_name = "B";
+		instr_name += condition_suffix(data["Cond"]);
+
+		s32 n24 = data["Offset"] & 0x000F0000 ? (0xFFF00000 | data["Offset"]) : data["Offset"];
+		u32 offset = address + 8 + 4 * n24;
+
+		op_1 = "Lxx_0x" + string_format("%X",offset);
 		break;
+	}
+
 	case ARMInstruction::Type::CoDataTrans:
-		result += "CoDataTrans";
+		instr_name = "CoDataTrans";
 		break;
 	case ARMInstruction::Type::CoDataOp:
-		result += "CoDataOp";
+		instr_name = "CoDataOp";
 		break;
 	case ARMInstruction::Type::CoRegTrans:
-		result += "CoRegTrans";
+		instr_name = "CoRegTrans";
 		break;
 	case ARMInstruction::Type::SWI:
-		result += "SWI";
+		instr_name = "SWI";
 		break;
 	default:
 		break;
 	}
 
+	result += instr_name;
+	if (op_1 != "") result += " " + op_1;
 	
 	return result;
 }

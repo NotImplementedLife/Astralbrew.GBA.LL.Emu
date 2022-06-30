@@ -2,3 +2,4 @@ Debug/
 bios/
 roms/
 *.user
+*_dump.bin
